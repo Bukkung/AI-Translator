@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AI Translator",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Translate selected text using AI",
   "permissions": [
     "storage",
@@ -10,6 +10,7 @@
   ],
   "host_permissions": [
     "https://api.openai.com/*",
+    "https://generativelanguage.googleapis.com/*",
     "http://localhost:*/*",
     "http://127.0.0.1:*/*"
   ],

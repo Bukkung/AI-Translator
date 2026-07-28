@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Chrome Manifest V3 extension that translates web page text via OpenAI or a local Ollama server. Plain JavaScript — no bundler, no build step, no tests.
+Chrome Manifest V3 extension that translates web page text via OpenAI, Google Gemini, or a local Ollama server. Plain JavaScript — no bundler, no build step, no tests.
 
 ## Development
 
@@ -15,14 +15,14 @@ Load the extension unpacked at `chrome://extensions/` → Developer mode → "Lo
 Three-layer message-passing design across the standard MV3 surfaces:
 
 - **[content.js](content.js)** runs in every frame. Handles two independent flows:
-  1. *Selection translation* — listens on `mouseup`, shows a floating `T`/`R` trigger button, opens a draggable/resizable **Shadow DOM** popup (Shadow DOM is required to isolate styles from arbitrary host pages).
-  2. *Full-page translation* — walks the DOM with `TreeWalker`, filters via `SKIP_TAGS` + [needsTranslation()](content.js#L525), batches text nodes by `maxChars` (3000), and replaces `node.textContent` in place. The pre-translation text for every touched node is stored in the `originalTexts` Map keyed by the live node — this is what `revertPageTranslation()` uses to restore the page and what dedupe checks rely on. A `MutationObserver` (started only after a successful page translation) auto-translates dynamically inserted nodes with a 500 ms debounce.
+  1. *Selection translation* — listens on `mouseup`, shows a floating trigger button (`T` = translate selection to target language; `R` = reverse-translate, shown only in editable fields, translates back to the detected source language), opens a draggable/resizable **Shadow DOM** popup (Shadow DOM is required to isolate styles from arbitrary host pages).
+  2. *Full-page translation* — walks the DOM with `TreeWalker`, filters via `SKIP_TAGS` + [needsTranslation()](content.js#L555), batches text nodes by `maxChars` (3000), and replaces `node.textContent` in place. The pre-translation text for every touched node is stored in the `originalTexts` Map keyed by the live node — this is what `revertPageTranslation()` uses to restore the page and what dedupe checks rely on. A `MutationObserver` (started only after a successful page translation) auto-translates dynamically inserted nodes with a 500 ms debounce.
 - **[background.js](background.js)** is the MV3 service worker and the **only** place that talks to the LLM APIs. Routes `translate` / `translateBatch` / `fetchOllamaModels` messages. Batch prompts use a numbered `[N] text` format — more reliable than separator-based parsing; `handleTranslateBatch` parses the response with `/^\[(\d+)\]\s*(.+)/` and falls back to the original text for any missing index. Caches the resolved provider config for 5s to avoid hammering `chrome.storage.sync`.
 - **[popup.js](popup.js)** is the toolbar settings UI. Fetches Ollama models **via the background script** (not directly) to bypass CORS. Sends `translatePage`/`revertPage`/`getPageTranslationState` messages to the active tab's content script.
 
 ### Provider abstraction
 
-`getProviderConfig()` in [background.js](background.js#L123) returns a uniform `{ url, model, headers }` shape; `callLLM()` then branches request/response shape on `config.provider`. OpenAI uses `/v1/chat/completions` with `Authorization: Bearer`; Ollama uses `/api/chat` with `{ stream: false }`. Concurrency limit differs by provider: **5 for OpenAI, 2 for Ollama** (local models are usually the bottleneck).
+`getProviderConfig()` in [background.js](background.js#L123) returns a uniform `{ provider, url, model, headers }` shape; `callLLM()` then branches request/response shape on `config.provider`. OpenAI uses `/v1/chat/completions` with `Authorization: Bearer` (response at `choices[0].message.content`); Gemini uses `…/v1beta/models/{model}:generateContent` with the `x-goog-api-key` header, a distinct body (`systemInstruction` + `contents[].parts[].text`, `generationConfig.maxOutputTokens`) and response at `candidates[0].content.parts[0].text`; Ollama uses `/api/chat` with `{ stream: false }` (response at `message.content`). Concurrency limit (set in [content.js](content.js#L615)) is **2 for Ollama, 5 for everything else** (OpenAI/Gemini cloud APIs).
 
 ### Ollama CORS workaround
 
@@ -34,7 +34,7 @@ Ollama rejects requests with a browser `Origin` header. The extension uses `decl
 
 ### Settings keys (chrome.storage.sync)
 
-`provider`, `apiKey`, `openaiModel`, `ollamaUrl`, `ollamaModel`, `style`, `targetLang`, `popupWidth`. Defaults live in `DEFAULT_SETTINGS` in [background.js](background.js#L2) and are seeded on `onInstalled`. The popup independently re-declares defaults when reading — keep these two lists aligned when adding a setting.
+`provider`, `apiKey` (OpenAI), `openaiModel`, `geminiApiKey`, `geminiModel`, `ollamaUrl`, `ollamaModel`, `style`, `targetLang`, `popupWidth`. Each cloud provider keeps its own key so switching providers doesn't clobber the other's credentials. Defaults live in `DEFAULT_SETTINGS` in [background.js](background.js#L2) and are seeded on `onInstalled`. The popup independently re-declares defaults when reading — keep these two lists aligned when adding a setting. Note the API keys themselves are **not** in `DEFAULT_SETTINGS` (never seeded).
 
 ## Things to keep in mind when editing
 

@@ -7,6 +7,7 @@ const DEFAULT_SETTINGS = {
   ollamaUrl: "http://localhost:11434",
   ollamaModel: "",
   openaiModel: "gpt-4o-mini",
+  geminiModel: "gemini-2.5-flash",
 };
 
 // Initialize defaults on first install
@@ -123,6 +124,7 @@ async function fetchOllamaModels(url) {
 async function getProviderConfig() {
   const data = await chrome.storage.sync.get([
     "provider", "apiKey", "ollamaUrl", "ollamaModel", "openaiModel",
+    "geminiApiKey", "geminiModel",
   ]);
   const provider = data.provider || "openai";
 
@@ -136,6 +138,22 @@ async function getProviderConfig() {
       url: `${base}/api/chat`,
       model: data.ollamaModel,
       headers: { "Content-Type": "application/json" },
+    };
+  }
+
+  if (provider === "gemini") {
+    if (!data.geminiApiKey) {
+      throw new Error("No Gemini API key set. Click the extension icon to configure.");
+    }
+    const model = data.geminiModel || "gemini-2.5-flash";
+    return {
+      provider: "gemini",
+      url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      model,
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": data.geminiApiKey,
+      },
     };
   }
 
@@ -172,9 +190,19 @@ async function callLLM(systemPrompt, userContent, maxTokens) {
     { role: "user", content: userContent },
   ];
 
-  const body = config.provider === "ollama"
-    ? { model: config.model, messages, stream: false, options: { temperature: 0.3 } }
-    : { model: config.model, messages, temperature: 0.3, max_tokens: maxTokens };
+  let body;
+  if (config.provider === "ollama") {
+    body = { model: config.model, messages, stream: false, options: { temperature: 0.3 } };
+  } else if (config.provider === "gemini") {
+    // Gemini native shape: system prompt goes in systemInstruction, user text in contents
+    body = {
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: "user", parts: [{ text: userContent }] }],
+      generationConfig: { temperature: 0.3, maxOutputTokens: maxTokens },
+    };
+  } else {
+    body = { model: config.model, messages, temperature: 0.3, max_tokens: maxTokens };
+  }
 
   let response;
   try {
@@ -196,8 +224,16 @@ async function callLLM(systemPrompt, userContent, maxTokens) {
 
   // Ollama native: { message: { content: "..." } }
   // OpenAI: { choices: [{ message: { content: "..." } }] }
+  // Gemini: { candidates: [{ content: { parts: [{ text: "..." }] } }] }
   if (config.provider === "ollama") {
     return result.message.content.trim();
+  }
+  if (config.provider === "gemini") {
+    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (text === undefined) {
+      throw new Error(`Gemini returned no text (finishReason: ${result.candidates?.[0]?.finishReason || "unknown"})`);
+    }
+    return text.trim();
   }
   return result.choices[0].message.content.trim();
 }

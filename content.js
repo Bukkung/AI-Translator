@@ -582,10 +582,14 @@
     if (pageTranslationState === "translating") return;
 
     const settings = await new Promise((r) =>
-      chrome.storage.sync.get({ apiKey: "", targetLang: "vietnamese", style: "casual", provider: "openai" }, r)
+      chrome.storage.sync.get({ apiKey: "", geminiApiKey: "", targetLang: "vietnamese", style: "casual", provider: "openai" }, r)
     );
-    if (settings.provider !== "ollama" && !settings.apiKey) {
+    if (settings.provider === "openai" && !settings.apiKey) {
       showLoadingError("No API key set. Open extension settings.");
+      return;
+    }
+    if (settings.provider === "gemini" && !settings.geminiApiKey) {
+      showLoadingError("No Gemini API key set. Open extension settings.");
       return;
     }
 

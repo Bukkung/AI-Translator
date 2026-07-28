@@ -1,18 +1,27 @@
 const apiKeyInput = document.getElementById("apiKey");
 const toggleKeyBtn = document.getElementById("toggleKey");
-const saveKeyBtn = document.getElementById("saveKey");
 const statusEl = document.getElementById("status");
-const styleRadios = document.querySelectorAll('input[name="style"]');
 const targetLangSelect = document.getElementById("targetLang");
 const translatePageBtn = document.getElementById("translatePage");
+const translatePageLabel = document.getElementById("translatePageLabel");
 const providerTabs = document.querySelectorAll(".provider-tab");
 const openaiSettings = document.getElementById("openaiSettings");
+const geminiSettings = document.getElementById("geminiSettings");
 const ollamaSettings = document.getElementById("ollamaSettings");
 const openaiModelSelect = document.getElementById("openaiModel");
+const geminiApiKeyInput = document.getElementById("geminiApiKey");
+const toggleGeminiKeyBtn = document.getElementById("toggleGeminiKey");
+const geminiModelSelect = document.getElementById("geminiModel");
 const ollamaUrlInput = document.getElementById("ollamaUrl");
 const ollamaModelSelect = document.getElementById("ollamaModel");
-const saveOllamaBtn = document.getElementById("saveOllama");
 const refreshOllamaBtn = document.getElementById("refreshOllama");
+const saveSettingsBtn = document.getElementById("saveSettings");
+
+// Currently selected provider tab (UI only — not persisted until Save)
+let activeProvider = "openai";
+// Ollama models are fetched from a server → load lazily, only when Ollama is active
+let ollamaLoaded = false;
+let savedOllamaModel = "";
 
 // Load saved settings
 chrome.storage.sync.get(
@@ -24,34 +33,44 @@ chrome.storage.sync.get(
     ollamaUrl: "http://localhost:11434",
     ollamaModel: "",
     openaiModel: "gpt-4o-mini",
+    geminiApiKey: "",
+    geminiModel: "gemini-2.5-flash",
   },
   (data) => {
     if (data.apiKey) apiKeyInput.value = data.apiKey;
+    if (data.geminiApiKey) geminiApiKeyInput.value = data.geminiApiKey;
     const radio = document.querySelector(`input[name="style"][value="${data.style}"]`);
     if (radio) radio.checked = true;
     targetLangSelect.value = data.targetLang;
     openaiModelSelect.value = data.openaiModel;
+    geminiModelSelect.value = data.geminiModel;
+    // Saved model may be a since-removed/deprecated one → fall back to default
+    if (!geminiModelSelect.value) geminiModelSelect.value = "gemini-2.5-flash";
     ollamaUrlInput.value = data.ollamaUrl;
+    savedOllamaModel = data.ollamaModel;
+    // switchProvider lazy-loads Ollama models only when Ollama is the active provider
     switchProvider(data.provider);
-    loadOllamaModels(data.ollamaUrl, data.ollamaModel);
   }
 );
 
-// Provider tabs
+// Provider tabs — switch the visible section only (no persistence)
 function switchProvider(provider) {
+  activeProvider = provider;
   providerTabs.forEach((tab) => {
     tab.classList.toggle("active", tab.dataset.provider === provider);
   });
   openaiSettings.classList.toggle("hidden", provider !== "openai");
+  geminiSettings.classList.toggle("hidden", provider !== "gemini");
   ollamaSettings.classList.toggle("hidden", provider !== "ollama");
-  chrome.storage.sync.set({ provider });
+
+  // Fetch Ollama models only when its tab is active, and only once
+  if (provider === "ollama" && !ollamaLoaded) {
+    loadOllamaModels(ollamaUrlInput.value.trim(), savedOllamaModel);
+  }
 }
 
 providerTabs.forEach((tab) => {
-  tab.addEventListener("click", () => {
-    switchProvider(tab.dataset.provider);
-    showStatus("Provider switched!", "success");
-  });
+  tab.addEventListener("click", () => switchProvider(tab.dataset.provider));
 });
 
 // Toggle API key visibility
@@ -59,21 +78,14 @@ toggleKeyBtn.addEventListener("click", () => {
   apiKeyInput.type = apiKeyInput.type === "password" ? "text" : "password";
 });
 
-// Save OpenAI settings
-saveKeyBtn.addEventListener("click", () => {
-  const key = apiKeyInput.value.trim();
-  if (!key) {
-    showStatus("Please enter an API key", "error");
-    return;
-  }
-  chrome.storage.sync.set({ apiKey: key, openaiModel: openaiModelSelect.value }, () => {
-    showStatus("OpenAI settings saved!", "success");
-  });
+toggleGeminiKeyBtn.addEventListener("click", () => {
+  geminiApiKeyInput.type = geminiApiKeyInput.type === "password" ? "text" : "password";
 });
 
-// Ollama: fetch models via background script (avoids CORS)
+// Ollama: fetch models via background script (avoids CORS). UI only — never persists.
 async function loadOllamaModels(url, selectedModel) {
   const base = url || ollamaUrlInput.value.trim() || "http://localhost:11434";
+  ollamaLoaded = true; // avoid duplicate concurrent loads while pending
   ollamaModelSelect.innerHTML = `<option value="">Loading...</option>`;
   ollamaModelSelect.disabled = true;
 
@@ -81,6 +93,7 @@ async function loadOllamaModels(url, selectedModel) {
     ollamaModelSelect.disabled = false;
 
     if (chrome.runtime.lastError || !response?.success) {
+      ollamaLoaded = false; // allow retry on next tab switch / refresh
       ollamaModelSelect.innerHTML = `<option value="">Failed to load</option>`;
       showStatus(response?.error || "Cannot connect to Ollama", "error");
       return;
@@ -98,13 +111,8 @@ async function loadOllamaModels(url, selectedModel) {
       .join("");
     ollamaModelSelect.innerHTML = options;
 
-    if (selectedModel && models.includes(selectedModel)) {
-      ollamaModelSelect.value = selectedModel;
-    } else {
-      ollamaModelSelect.value = models[0];
-      // Auto-save so stale model name gets replaced
-      chrome.storage.sync.set({ ollamaModel: models[0] });
-    }
+    // Preselect the saved model if still available, otherwise the first one (UI only)
+    ollamaModelSelect.value = selectedModel && models.includes(selectedModel) ? selectedModel : models[0];
   });
 }
 
@@ -112,32 +120,36 @@ refreshOllamaBtn.addEventListener("click", () => {
   loadOllamaModels(ollamaUrlInput.value.trim(), ollamaModelSelect.value);
 });
 
-// Save Ollama settings
-saveOllamaBtn.addEventListener("click", () => {
-  const url = ollamaUrlInput.value.trim() || "http://localhost:11434";
-  const model = ollamaModelSelect.value;
-  if (!model) {
-    showStatus("Please select a model", "error");
+// --- Unified Save: nothing persists until this is clicked ---
+saveSettingsBtn.addEventListener("click", () => {
+  // Validate the active provider's required credential
+  if (activeProvider === "openai" && !apiKeyInput.value.trim()) {
+    showStatus("Please enter your OpenAI API key", "error");
     return;
   }
-  chrome.storage.sync.set({ ollamaUrl: url, ollamaModel: model }, () => {
-    showStatus("Ollama settings saved!", "success");
-  });
-});
+  if (activeProvider === "gemini" && !geminiApiKeyInput.value.trim()) {
+    showStatus("Please enter your Gemini API key", "error");
+    return;
+  }
+  if (activeProvider === "ollama" && !ollamaModelSelect.value) {
+    showStatus("Please select an Ollama model", "error");
+    return;
+  }
 
-// Save style on change
-styleRadios.forEach((radio) => {
-  radio.addEventListener("change", (e) => {
-    chrome.storage.sync.set({ style: e.target.value }, () => {
-      showStatus("Style updated!", "success");
-    });
-  });
-});
+  const settings = {
+    provider: activeProvider,
+    apiKey: apiKeyInput.value.trim(),
+    openaiModel: openaiModelSelect.value,
+    geminiApiKey: geminiApiKeyInput.value.trim(),
+    geminiModel: geminiModelSelect.value,
+    ollamaUrl: ollamaUrlInput.value.trim() || "http://localhost:11434",
+    ollamaModel: ollamaModelSelect.value,
+    style: document.querySelector('input[name="style"]:checked')?.value || "casual",
+    targetLang: targetLangSelect.value,
+  };
 
-// Save target language on change
-targetLangSelect.addEventListener("change", (e) => {
-  chrome.storage.sync.set({ targetLang: e.target.value }, () => {
-    showStatus("Target language updated!", "success");
+  chrome.storage.sync.set(settings, () => {
+    showStatus("Settings saved!", "success");
   });
 });
 
@@ -147,15 +159,15 @@ let currentPageState = "idle";
 function updateTranslatePageBtn(state) {
   currentPageState = state;
   if (state === "translating") {
-    translatePageBtn.textContent = "Translating...";
+    translatePageLabel.textContent = "Translating...";
     translatePageBtn.disabled = true;
     translatePageBtn.classList.remove("revert");
   } else if (state === "translated") {
-    translatePageBtn.textContent = "Revert Translation";
+    translatePageLabel.textContent = "Revert Translation";
     translatePageBtn.disabled = false;
     translatePageBtn.classList.add("revert");
   } else {
-    translatePageBtn.textContent = "Translate This Page";
+    translatePageLabel.textContent = "Translate This Page";
     translatePageBtn.disabled = false;
     translatePageBtn.classList.remove("revert");
   }
@@ -185,10 +197,29 @@ translatePageBtn.addEventListener("click", () => {
   });
 });
 
+const STATUS_ICONS = {
+  success:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+  error:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+};
+
+let statusHideTimer = null;
+let statusRemoveTimer = null;
+
 function showStatus(message, type) {
-  statusEl.textContent = message;
+  clearTimeout(statusHideTimer);
+  clearTimeout(statusRemoveTimer);
+
+  const icon = STATUS_ICONS[type] || "";
+  statusEl.innerHTML = `${icon}<span class="status-text"></span>`;
+  statusEl.querySelector(".status-text").textContent = message;
   statusEl.className = `status ${type}`;
-  setTimeout(() => {
-    statusEl.className = "status hidden";
-  }, 2000);
+
+  statusHideTimer = setTimeout(() => {
+    statusEl.classList.add("hide");
+    statusRemoveTimer = setTimeout(() => {
+      statusEl.className = "status hidden";
+    }, 200);
+  }, 2200);
 }

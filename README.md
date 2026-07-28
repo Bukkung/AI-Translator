@@ -3,15 +3,16 @@
 ### Overview
 
 AI Translator is a Chrome extension that translates text on any web page using AI.
-It supports two translation modes: **selected text translation** and **full page translation**, with two AI backend options: **OpenAI** and **Ollama** (local).
+It supports two translation modes: **selected text translation** and **full page translation**, with three AI backend options: **OpenAI**, **Google Gemini**, and **Ollama** (local).
 
 ### Key Features
 
 - **Select & Translate**: Select any text on a page, click the **T** button to see the translation in a popup.
 - **Reverse Translate**: In editable fields, click the **R** button to translate text back to the detected source language.
 - **Full Page Translation**: Translate the entire page at once from the extension popup. New content added dynamically is auto-translated.
-- **Dual AI Provider**:
+- **Multiple AI Providers**:
   - **OpenAI**: 7 model options — `gpt-4o-mini`, `gpt-4o`, `gpt-4-turbo`, `gpt-4.1-nano`, `gpt-4.1-mini`, `gpt-4.1`, `gpt-3.5-turbo`.
+  - **Google Gemini**: API-key based, model options — `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-2.5-pro`.
   - **Ollama**: Connect to a local Ollama server, auto-loads available models.
 - **Auto Language Detection**: Detects English, Vietnamese, Japanese, Korean, Chinese, French, German, Spanish, Portuguese, Russian, Thai, Indonesian, Italian, Dutch, Arabic, Hindi based on character patterns.
 - **16 Target Languages**: Vietnamese, English, Japanese, Chinese, Korean, French, German, Spanish, Portuguese, Russian, Thai, Indonesian, Italian, Dutch, Arabic, Hindi.
@@ -106,6 +107,7 @@ It supports two translation modes: **selected text translation** and **full page
 | `activeTab` | Access the active tab for in-page translation |
 | `declarativeNetRequest` | Strip Origin header for Ollama localhost CORS compatibility |
 | `host_permissions: https://api.openai.com/*` | Connect to OpenAI API |
+| `host_permissions: https://generativelanguage.googleapis.com/*` | Connect to Google Gemini API |
 | `host_permissions: http://localhost:*/*`, `http://127.0.0.1:*/*` | Connect to local Ollama server |
 
 - The API key is **only stored locally** in `chrome.storage.sync`.
