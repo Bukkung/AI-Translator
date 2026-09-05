@@ -2,12 +2,14 @@
 
 ### Overview
 
-AI Translator is a Chrome extension that translates text on any web page using AI.
+AI Translator is a Chrome extension for context-aware English-to-Thai translation of technical documents.
 It supports two translation modes: **selected text translation** and **full page translation**, with three AI backend options: **OpenAI**, **Google Gemini**, and **Ollama** (local).
 
 ### Key Features
 
-- **Select & Translate**: Select any text on a page, click the **T** button to see the translation in a popup.
+- **Context-aware selection**: Uses the current readable block plus the previous and next readable blocks to disambiguate technical terms.
+- **Translate / Explain**: Translate only the selected text or get a concise explanation grounded in its surrounding context.
+- **Local-first defaults**: New installs default to Ollama and Thai; choose an installed Qwen model in settings.
 - **Reverse Translate**: In editable fields, click the **R** button to translate text back to the detected source language.
 - **Full Page Translation**: Translate the entire page at once from the extension popup. New content added dynamically is auto-translated.
 - **Multiple AI Providers**:
@@ -28,12 +30,12 @@ It supports two translation modes: **selected text translation** and **full page
    - Listens for text selection on the page.
    - Shows a floating **T** button (and **R** button for editable fields) near the selection.
    - Opens a draggable/resizable popup (Shadow DOM) showing the translation result.
-   - Detects source language, loads config from `chrome.storage.sync`, and sends a `translate` message to the background script.
+   - Collects bounded surrounding context and sends a `translateSelection` message to the background script.
    - Handles full page translation: walks the DOM, collects text nodes (skipping code/scripts/URLs), sends batches to background, and replaces text with translations.
    - Uses `MutationObserver` to auto-translate dynamically added content during page translation.
 
 2. **Background Service Worker (`background.js`)**
-   - Receives `translate` and `translateBatch` messages from the content script.
+   - Receives `translateSelection`, `translate`, and `translateBatch` messages from the content script.
    - Routes requests to **OpenAI API** or **Ollama API** based on the selected provider.
    - Builds system prompts with source/target language and style instructions.
    - Handles batch translation with numbered format for accuracy.
@@ -56,7 +58,7 @@ It supports two translation modes: **selected text translation** and **full page
 2. Open Chrome (or any Chromium-based browser like Edge, Brave).
 3. Go to `chrome://extensions/`.
 4. Enable **Developer mode**.
-5. Click **Load unpacked** and select the `ai-translator` folder.
+5. Click **Load unpacked** and select this project folder.
 
 #### 2. Configure your AI provider
 

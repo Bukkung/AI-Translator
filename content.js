@@ -3,7 +3,25 @@
   let popupHost = null;
   let shadowRoot = null;
   let currentSelection = "";
+  let currentSelectionContext = { previous: "", current: "", next: "" };
+  let currentMode = "translate";
+  let selectionRequestId = 0;
   let lastDetectedSourceLang = null;
+
+  const CONTEXT_BLOCK_SELECTOR = [
+    "p", "li", "blockquote", "td", "th", "dt", "dd", "figcaption",
+    "h1", "h2", "h3", "h4", "h5", "h6",
+  ].join(",");
+  const CONTEXT_BLOCK_TAGS = new Set([
+    "P", "LI", "BLOCKQUOTE", "TD", "TH", "DT", "DD", "FIGCAPTION",
+    "H1", "H2", "H3", "H4", "H5", "H6", "ARTICLE", "SECTION", "MAIN", "DIV",
+  ]);
+  const CONTEXT_SKIP_SELECTOR = [
+    "script", "style", "noscript", "svg", "canvas", "code", "pre", "kbd", "samp",
+    "#ai-translator-popup-host", "#ai-translator-loading-host", ".ai-translator-trigger-container",
+  ].join(",");
+  const CONTEXT_BLOCK_LIMIT = 1500;
+  const CONTEXT_TOTAL_LIMIT = 4000;
 
   // --- Full Page Translation State ---
   let pageTranslationState = "idle"; // "idle" | "translating" | "translated"
@@ -131,6 +149,88 @@
     }
   }
 
+  function normalizeContextText(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
+  function truncateContextText(value, limit = CONTEXT_BLOCK_LIMIT) {
+    const text = normalizeContextText(value);
+    if (limit <= 0) return "";
+    if (text.length <= limit) return text;
+    return `${text.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
+  }
+
+  function isReadableContextBlock(element) {
+    if (!element || element === document.body || element === document.documentElement) return false;
+    if (element.matches?.(CONTEXT_SKIP_SELECTOR) || element.closest?.(CONTEXT_SKIP_SELECTOR)) return false;
+    if (element.hidden || element.getAttribute?.("aria-hidden") === "true") return false;
+    const style = window.getComputedStyle(element);
+    if (style.display === "none" || style.visibility === "hidden") return false;
+    if (element.getClientRects().length === 0) return false;
+    return normalizeContextText(element.innerText || element.textContent).length >= 2;
+  }
+
+  function findCurrentContextBlock(range) {
+    let element = range.commonAncestorContainer;
+    if (element.nodeType !== Node.ELEMENT_NODE) element = element.parentElement;
+    let blockFallback = null;
+
+    while (element && element !== document.body) {
+      if (CONTEXT_BLOCK_TAGS.has(element.tagName) && isReadableContextBlock(element)) {
+        if (element.tagName !== "DIV" && element.tagName !== "SECTION" && element.tagName !== "ARTICLE" && element.tagName !== "MAIN") {
+          return element;
+        }
+        if (!blockFallback && window.getComputedStyle(element).display !== "inline") blockFallback = element;
+      }
+      element = element.parentElement;
+    }
+    return blockFallback;
+  }
+
+  function collectSelectionContext(range) {
+    try {
+      const currentBlock = findCurrentContextBlock(range);
+      if (!currentBlock) return { previous: "", current: "", next: "" };
+
+      const candidates = Array.from(document.querySelectorAll(CONTEXT_BLOCK_SELECTOR))
+        .filter(isReadableContextBlock);
+      const currentIndex = candidates.indexOf(currentBlock);
+      let previousBlock = null;
+      let nextBlock = null;
+
+      if (currentIndex >= 0) {
+        previousBlock = candidates[currentIndex - 1] || null;
+        nextBlock = candidates[currentIndex + 1] || null;
+      } else {
+        for (const candidate of candidates) {
+          const position = candidate.compareDocumentPosition(currentBlock);
+          if (position & Node.DOCUMENT_POSITION_FOLLOWING) {
+            previousBlock = candidate;
+          } else if (position & Node.DOCUMENT_POSITION_PRECEDING) {
+            nextBlock = candidate;
+            break;
+          }
+        }
+      }
+
+      const current = truncateContextText(currentBlock.innerText || currentBlock.textContent);
+      let previous = truncateContextText(previousBlock?.innerText || previousBlock?.textContent);
+      let next = truncateContextText(nextBlock?.innerText || nextBlock?.textContent);
+      if (previous === current) previous = "";
+      if (next === current || next === previous) next = "";
+
+      const context = { previous, current, next };
+      let remaining = CONTEXT_TOTAL_LIMIT;
+      for (const key of ["current", "previous", "next"]) {
+        context[key] = truncateContextText(context[key], remaining);
+        remaining = Math.max(0, remaining - context[key].length);
+      }
+      return context;
+    } catch {
+      return { previous: "", current: "", next: "" };
+    }
+  }
+
   // --- Build target language <option> list ---
   function buildLangOptions(selectedLang) {
     return Object.entries(LANGUAGES)
@@ -165,6 +265,10 @@
             <select class="lang-select" id="targetSelect">${buildLangOptions(targetLang)}</select>
           </div>
           <button class="close-btn" id="closeBtn">\u2715</button>
+        </div>
+        <div class="mode-switch" role="group" aria-label="Result mode">
+          <button class="mode-btn active" id="translateMode" type="button" aria-pressed="true">Translate</button>
+          <button class="mode-btn" id="explainMode" type="button" aria-pressed="false">Explain</button>
         </div>
         <div class="result" id="result">
           <div class="loading"><span class="spinner"></span> Translating...</div>
@@ -260,17 +364,33 @@
       });
     });
 
+    function setMode(mode) {
+      currentMode = mode;
+      const translateBtn = shadowRoot.getElementById("translateMode");
+      const explainBtn = shadowRoot.getElementById("explainMode");
+      const isTranslate = mode === "translate";
+      translateBtn.classList.toggle("active", isTranslate);
+      explainBtn.classList.toggle("active", !isTranslate);
+      translateBtn.setAttribute("aria-pressed", String(isTranslate));
+      explainBtn.setAttribute("aria-pressed", String(!isTranslate));
+      const targetSel = shadowRoot.getElementById("targetSelect");
+      translate(currentSelection, sourceLang, targetSel.value, mode);
+    }
+
+    shadowRoot.getElementById("translateMode").addEventListener("click", () => setMode("translate"));
+    shadowRoot.getElementById("explainMode").addEventListener("click", () => setMode("explain"));
+
     // Target language change → re-translate
     shadowRoot.getElementById("targetSelect").addEventListener("change", (e) => {
       chrome.storage.sync.set({ targetLang: e.target.value });
-      translate(currentSelection, sourceLang, e.target.value);
+      translate(currentSelection, sourceLang, e.target.value, currentMode);
     });
 
     // Style change → re-translate
     shadowRoot.getElementById("styleSelect").addEventListener("change", (e) => {
       chrome.storage.sync.set({ style: e.target.value });
       const targetSel = shadowRoot.getElementById("targetSelect");
-      translate(currentSelection, sourceLang, targetSel.value);
+      translate(currentSelection, sourceLang, targetSel.value, currentMode);
     });
 
     // Resize handles
@@ -403,19 +523,31 @@
   }
 
   // --- Translation ---
-  function translate(text, sourceLang, targetLang) {
+  function translate(text, sourceLang, targetLang, mode = currentMode) {
     if (!shadowRoot) return;
     if (!isExtensionValid()) { cleanup(); return; }
     const resultEl = shadowRoot.getElementById("result");
-    resultEl.innerHTML = `<div class="loading"><span class="spinner"></span> Translating...</div>`;
+    const loadingLabel = mode === "explain" ? "Explaining..." : "Translating...";
+    resultEl.innerHTML = `<div class="loading"><span class="spinner"></span> ${loadingLabel}</div>`;
     const copyBtn = shadowRoot.getElementById("copyBtn");
     copyBtn.disabled = true;
+    const requestId = ++selectionRequestId;
 
     chrome.storage.sync.get({ style: "casual" }, (data) => {
       const style = data.style;
       chrome.runtime.sendMessage(
-        { action: "translate", text, sourceLang, targetLang, style },
+        {
+          action: "translateSelection",
+          mode,
+          selectedText: text,
+          context: currentSelectionContext,
+          sourceLang,
+          targetLang,
+          style,
+          domain: "engineering",
+        },
         (response) => {
+          if (requestId !== selectionRequestId || !shadowRoot) return;
           if (chrome.runtime.lastError) {
             showError(chrome.runtime.lastError.message);
             return;
@@ -441,15 +573,17 @@
 
     removeTrigger();
 
+    currentMode = "translate";
+    currentSelectionContext = collectSelectionContext(sel.getRangeAt(0));
     const sourceLang = detectLanguage(text);
     lastDetectedSourceLang = sourceLang;
 
-    // Use saved target language, fallback to vietnamese
-    chrome.storage.sync.get({ targetLang: "vietnamese" }, (data) => {
+    // Use saved target language, fallback to Thai for this project.
+    chrome.storage.sync.get({ targetLang: "thai" }, (data) => {
       let targetLang = data.targetLang;
       // If source and target are the same, switch to english
       if (targetLang === sourceLang) {
-        targetLang = sourceLang === "english" ? "vietnamese" : "english";
+        targetLang = sourceLang === "english" ? "thai" : "english";
       }
       createPopup(rect, sourceLang, targetLang);
       translate(text, sourceLang, targetLang);
@@ -467,15 +601,16 @@
 
     removeTrigger();
 
+    currentMode = "translate";
     const sourceLang = detectLanguage(text);
     let targetLang = lastDetectedSourceLang;
 
     // If reverse target equals detected source, fall back to saved targetLang
     if (targetLang === sourceLang) {
-      chrome.storage.sync.get({ targetLang: "vietnamese" }, (data) => {
+      chrome.storage.sync.get({ targetLang: "thai" }, (data) => {
         let fallback = data.targetLang;
         if (fallback === sourceLang) {
-          fallback = sourceLang === "english" ? "vietnamese" : "english";
+          fallback = sourceLang === "english" ? "thai" : "english";
         }
         createPopup(rect, sourceLang, fallback);
         translate(text, sourceLang, fallback);
@@ -508,6 +643,7 @@
       currentSelection = text;
       try {
         const range = sel.getRangeAt(0);
+        currentSelectionContext = collectSelectionContext(range);
         const rect = range.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) return;
         const anchorEl = sel.anchorNode?.nodeType === Node.ELEMENT_NODE
@@ -582,7 +718,7 @@
     if (pageTranslationState === "translating") return;
 
     const settings = await new Promise((r) =>
-      chrome.storage.sync.get({ apiKey: "", geminiApiKey: "", targetLang: "vietnamese", style: "casual", provider: "openai" }, r)
+      chrome.storage.sync.get({ apiKey: "", geminiApiKey: "", targetLang: "thai", style: "casual", provider: "ollama" }, r)
     );
     if (settings.provider === "openai" && !settings.apiKey) {
       showLoadingError("No API key set. Open extension settings.");
@@ -613,7 +749,7 @@
     let sourceLang = detectLanguage(sampleText);
     let targetLang = settings.targetLang;
     if (targetLang === sourceLang) {
-      targetLang = sourceLang === "english" ? "vietnamese" : "english";
+      targetLang = sourceLang === "english" ? "thai" : "english";
     }
 
     const CONCURRENCY = settings.provider === "ollama" ? 2 : 5;
@@ -1017,6 +1153,42 @@
         line-height: 1.6;
         white-space: pre-wrap;
         word-break: break-word;
+      }
+
+      .mode-switch {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        padding: 8px 14px 0;
+        background: #ffffff;
+        flex-shrink: 0;
+      }
+
+      .mode-btn {
+        padding: 6px 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: #f8fafc;
+        color: #475569;
+        font: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .mode-btn:hover {
+        background: #f1f5f9;
+      }
+
+      .mode-btn.active {
+        border-color: #2563eb;
+        background: #eff6ff;
+        color: #1d4ed8;
+      }
+
+      .mode-btn:focus-visible {
+        outline: 2px solid #93c5fd;
+        outline-offset: 1px;
       }
 
       .loading {

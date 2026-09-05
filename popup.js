@@ -28,8 +28,8 @@ chrome.storage.sync.get(
   {
     apiKey: "",
     style: "casual",
-    targetLang: "vietnamese",
-    provider: "openai",
+    targetLang: "thai",
+    provider: "ollama",
     ollamaUrl: "http://localhost:11434",
     ollamaModel: "",
     openaiModel: "gpt-4o-mini",

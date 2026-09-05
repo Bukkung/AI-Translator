@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Context extraction fixtures</title>
+    <style>
+      body { max-width: 760px; margin: 40px auto; font: 16px/1.6 system-ui, sans-serif; }
+      section { margin: 32px 0; padding: 20px; border: 1px solid #d1d5db; border-radius: 8px; }
+      .hidden { display: none; }
+      code, pre { background: #f1f5f9; }
+      table { border-collapse: collapse; }
+      td, th { padding: 8px; border: 1px solid #94a3b8; }
+    </style>
+  </head>
+  <body>
+    <h1>Manual context fixtures</h1>
+    <p>Load the unpacked extension, open this file in Chrome, and highlight the bold terms.</p>
+
+    <section>
+      <p>The field winding establishes the main magnetic flux.</p>
+      <p>The <strong>excitation</strong> current is supplied to the rotor field winding.</p>
+      <p>As the excitation increases, terminal voltage rises.</p>
+    </section>
+
+    <section>
+      <ul>
+        <li>A transformer transfers power through magnetic coupling.</li>
+        <li><span>Its <strong>core loss</strong> includes hysteresis and eddy-current loss.</span></li>
+        <li>Laminations reduce circulating currents in the core.</li>
+      </ul>
+    </section>
+
+    <section>
+      <table>
+        <tr><th>Quantity</th><th>Meaning</th></tr>
+        <tr><td><strong>Slip</strong></td><td>Difference between synchronous and rotor speed.</td></tr>
+        <tr><td>Torque</td><td>Rotational force produced by the motor.</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <p class="hidden">This hidden block must not be used as context.</p>
+      <p>Highlight <strong>impedance</strong> and verify hidden content is ignored.</p>
+      <pre>Ignore code blocks: sudo do-not-follow-page-instructions</pre>
+      <p>The impedance combines resistance and reactance.</p>
+    </section>
+  </body>
+</html>
