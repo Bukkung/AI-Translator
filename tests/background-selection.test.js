@@ -67,6 +67,7 @@ test("translateSelection sends bounded context as untrusted document data", asyn
   assert.equal(body.stream, false);
   assert.match(body.messages[0].content, /untrusted document text/);
   assert.match(body.messages[0].content, /Translate only the selected text from English to Thai/);
+  assert.match(body.messages[0].content, /Preferred Thai engineering term.*การกระตุ้นสนามแม่เหล็ก/);
   const payload = JSON.parse(body.messages[1].content);
   assert.equal(payload.selected_text, "excitation");
   assert.match(payload.surrounding_context.current, /excitation current/);

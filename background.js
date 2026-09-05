@@ -287,6 +287,13 @@ async function handleTranslate(text, sourceLang, targetLang, style) {
 
 const SELECTION_LIMIT = 2000;
 const CONTEXT_BLOCK_LIMIT = 1500;
+const ENGINEERING_GLOSSARY = {
+  excitation: "การกระตุ้นสนามแม่เหล็ก",
+  "excitation current": "กระแสกระตุ้นสนาม",
+  "field winding": "ขดลวดสนาม",
+  slip: "สลิป",
+  "core loss": "การสูญเสียในแกน",
+};
 
 function cleanPromptText(value, limit) {
   return String(value || "")
@@ -300,6 +307,7 @@ async function handleSelectionRequest(request) {
   if (!selectedText) throw new Error("No selected text was provided.");
 
   const mode = request.mode === "explain" ? "explain" : "translate";
+  const preferredTerm = ENGINEERING_GLOSSARY[selectedText.toLowerCase()];
   const source = LANG_NAMES[request.sourceLang] || "English";
   const target = LANG_NAMES[request.targetLang] || "Thai";
   const styleInstruction = STYLE_PROMPTS[request.style] || STYLE_PROMPTS.casual;
@@ -340,6 +348,9 @@ async function handleSelectionRequest(request) {
   const systemPrompt = [
     "You are an expert translator for technical and engineering documents.",
     ...commonRules,
+    ...(preferredTerm
+      ? [`Preferred Thai engineering term for this exact selection: ${preferredTerm}. Use it when consistent with the supplied context.`]
+      : []),
     ...taskRules,
   ].join("\n");
 
