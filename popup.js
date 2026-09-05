@@ -31,7 +31,7 @@ chrome.storage.sync.get(
     targetLang: "thai",
     provider: "ollama",
     ollamaUrl: "http://localhost:11434",
-    ollamaModel: "",
+    ollamaModel: "qwen3:8b",
     openaiModel: "gpt-4o-mini",
     geminiApiKey: "",
     geminiModel: "gemini-2.5-flash",

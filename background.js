@@ -5,7 +5,7 @@ const DEFAULT_SETTINGS = {
   popupWidth: 340,
   provider: "ollama",
   ollamaUrl: "http://localhost:11434",
-  ollamaModel: "",
+  ollamaModel: "qwen3:8b",
   openaiModel: "gpt-4o-mini",
   geminiModel: "gemini-2.5-flash",
 };

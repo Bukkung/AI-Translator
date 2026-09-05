@@ -9,7 +9,7 @@ It supports two translation modes: **selected text translation** and **full page
 
 - **Context-aware selection**: Uses the current readable block plus the previous and next readable blocks to disambiguate technical terms.
 - **Translate / Explain**: Translate only the selected text or get a concise explanation grounded in its surrounding context.
-- **Local-first defaults**: New installs default to Ollama and Thai; choose an installed Qwen model in settings.
+- **Local-first defaults**: New installs default to Ollama, `qwen3:8b`, and Thai.
 - **Reverse Translate**: In editable fields, click the **R** button to translate text back to the detected source language.
 - **Full Page Translation**: Translate the entire page at once from the extension popup. New content added dynamically is auto-translated.
 - **Multiple AI Providers**:
