@@ -1,8 +1,8 @@
-## AI Translator – Chrome Extension
+## Ramantic – Context-aware Translator
 
 ### Overview
 
-AI Translator is a Chrome extension for context-aware English-to-Thai translation of technical documents.
+Ramantic is a Chrome extension for context-aware English-to-Thai translation of technical documents.
 It supports two translation modes: **selected text translation** and **full page translation**, with three AI backend options: **OpenAI**, **Google Gemini**, and **Ollama** (local).
 
 ### Key Features
@@ -62,7 +62,7 @@ It supports two translation modes: **selected text translation** and **full page
 
 #### 2. Configure your AI provider
 
-1. Click the **AI Translator** extension icon in the browser toolbar.
+1. Click the **Ramantic** extension icon in the browser toolbar.
 2. Choose your provider:
    - **OpenAI**: Paste your API key, select a model, and click **Save**.
    - **Ollama**: Enter your Ollama server URL (default: `http://localhost:11434`), click the refresh button to load models, select a model, and click **Save**.

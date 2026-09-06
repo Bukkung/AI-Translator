@@ -1,4 +1,4 @@
-# Context-aware English-to-Thai translator
+# Ramantic: Context-aware English-to-Thai translator
 
 ## Scope for the first release
 
@@ -66,4 +66,3 @@ For selections inside `INPUT` or `TEXTAREA`, use the element value as current co
 ## Upstream integration
 
 The local remote named `upstream` points to `thainph/ai-trans`. A future GitHub fork should be added as `origin`; feature work must never be pushed directly to `upstream`.
-

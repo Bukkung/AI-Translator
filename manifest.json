@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "AI Translator",
+  "name": "Ramantic",
   "version": "1.2.0",
-  "description": "Context-aware English-to-Thai translation with local AI",
+  "description": "Context-aware English-to-Thai translation for technical documents",
   "permissions": [
     "storage",
     "activeTab",
