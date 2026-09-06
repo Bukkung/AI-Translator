@@ -13,7 +13,7 @@ It supports two translation modes: **selected text translation** and **full page
 - **Reverse Translate**: In editable fields, click the **R** button to translate text back to the detected source language.
 - **Full Page Translation**: Translate the entire page at once from the extension popup. New content added dynamically is auto-translated.
 - **Multiple AI Providers**:
-  - **OpenAI**: 7 model options — `gpt-4o-mini`, `gpt-4o`, `gpt-4-turbo`, `gpt-4.1-nano`, `gpt-4.1-mini`, `gpt-4.1`, `gpt-3.5-turbo`.
+  - **OpenAI**: 6 model options — `gpt-4.1-nano` (default), `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol`, `gpt-4o-mini`, `gpt-4.1-mini`.
   - **Google Gemini**: API-key based, model options — `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-2.5-pro`.
   - **Ollama**: Connect to a local Ollama server, auto-loads available models.
 - **Auto Language Detection**: Detects English, Vietnamese, Japanese, Korean, Chinese, French, German, Spanish, Portuguese, Russian, Thai, Indonesian, Italian, Dutch, Arabic, Hindi based on character patterns.
@@ -123,4 +123,4 @@ It supports two translation modes: **selected text translation** and **full page
 - Batch translation uses concurrency limits: **5 concurrent requests** for OpenAI, **2** for Ollama.
 - `MutationObserver` watches for dynamically added content during page translation and auto-translates within a 500ms batching window.
 - Text filtering skips code blocks, scripts, stylesheets, canvas, SVG, input fields, URLs, and pure numbers.
-- API parameters: `temperature: 0.3`, `max_tokens: 1024` (single) / `4096` (batch).
+- API parameters: GPT-5.6 uses `reasoning_effort: none` with `max_completion_tokens`; older OpenAI models use `temperature: 0.3` with `max_tokens`. Limits are `1024` tokens (single) / `4096` (batch).

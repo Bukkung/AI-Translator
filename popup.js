@@ -33,7 +33,7 @@ chrome.storage.sync.get(
     provider: "ollama",
     ollamaUrl: "http://localhost:11434",
     ollamaModel: "qwen3:8b",
-    openaiModel: "gpt-4o-mini",
+    openaiModel: "gpt-4.1-nano",
     geminiApiKey: "",
     geminiModel: "gemini-2.5-flash",
   },
@@ -54,6 +54,8 @@ chrome.storage.sync.get(
     if (radio) radio.checked = true;
     targetLangSelect.value = data.targetLang;
     openaiModelSelect.value = data.openaiModel;
+    // Saved model may no longer be offered → fall back to the current default.
+    if (!openaiModelSelect.value) openaiModelSelect.value = "gpt-4.1-nano";
     geminiModelSelect.value = data.geminiModel;
     // Saved model may be a since-removed/deprecated one → fall back to default
     if (!geminiModelSelect.value) geminiModelSelect.value = "gemini-2.5-flash";

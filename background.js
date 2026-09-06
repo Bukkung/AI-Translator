@@ -6,7 +6,7 @@ const DEFAULT_SETTINGS = {
   provider: "ollama",
   ollamaUrl: "http://localhost:11434",
   ollamaModel: "qwen3:8b",
-  openaiModel: "gpt-4o-mini",
+  openaiModel: "gpt-4.1-nano",
   geminiModel: "gemini-2.5-flash",
 };
 
@@ -180,7 +180,7 @@ async function getProviderConfig() {
   return {
     provider: "openai",
     url: "https://api.openai.com/v1/chat/completions",
-    model: data.openaiModel || "gpt-4o-mini",
+    model: data.openaiModel || "gpt-4.1-nano",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${data.apiKey}`,
@@ -221,6 +221,14 @@ async function callLLM(systemPrompt, userContent, maxTokens) {
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: "user", parts: [{ text: userContent }] }],
       generationConfig: { temperature: 0.3, maxOutputTokens: maxTokens },
+    };
+  } else if (/^gpt-5\.6-/.test(config.model)) {
+    // GPT-5.6 models use reasoning controls and reject sampling parameters.
+    body = {
+      model: config.model,
+      messages,
+      reasoning_effort: "none",
+      max_completion_tokens: maxTokens,
     };
   } else {
     body = { model: config.model, messages, temperature: 0.3, max_tokens: maxTokens };

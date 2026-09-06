@@ -118,3 +118,27 @@ test("OpenAI provider reads the API key from device-local storage", async () => 
   assert.equal(harness.getRequest().url, "https://api.openai.com/v1/chat/completions");
   assert.equal(harness.getRequest().options.headers.Authorization, "Bearer sk-device-local");
 });
+
+test("GPT-5.6 uses low-latency reasoning-compatible parameters", async () => {
+  const harness = createHarness("คำแปล", {
+    sync: { provider: "openai", openaiModel: "gpt-5.6-luna" },
+    local: { apiKey: "sk-device-local" },
+  });
+
+  const response = await harness.send({
+    action: "translateSelection",
+    mode: "translate",
+    selectedText: "current",
+    sourceLang: "english",
+    targetLang: "thai",
+    context: { current: "The current flows through the winding." },
+  });
+
+  assert.equal(response.success, true);
+  const body = harness.getRequestBody();
+  assert.equal(body.model, "gpt-5.6-luna");
+  assert.equal(body.reasoning_effort, "none");
+  assert.equal(body.max_completion_tokens, 1024);
+  assert.equal("temperature" in body, false);
+  assert.equal("max_tokens" in body, false);
+});
