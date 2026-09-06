@@ -6,11 +6,16 @@ const vm = require("node:vm");
 
 function createHarness(modelResponse = "ผลลัพธ์", storageData = {}) {
   let messageListener;
+  let contextMenuListener;
   let fetchRequest;
+  let createdWindow;
+  const localState = { ...(storageData.local || {}) };
+  const sessionState = {};
   const chrome = {
     runtime: {
       onInstalled: { addListener() {} },
       onMessage: { addListener(listener) { messageListener = listener; } },
+      getURL(resource) { return `chrome-extension://test/${resource}`; },
     },
     storage: {
       sync: {
@@ -24,8 +29,26 @@ function createHarness(modelResponse = "ผลลัพธ์", storageData = {}
         },
       },
       local: {
-        async get() { return storageData.local || {}; },
+        async get(keys) {
+          if (typeof keys === "string") return { [keys]: localState[keys] };
+          return localState;
+        },
+        async set(values) { Object.assign(localState, values); },
       },
+      session: {
+        async get(key) { return { [key]: sessionState[key] }; },
+        async set(values) { Object.assign(sessionState, values); },
+        async remove(key) { delete sessionState[key]; },
+      },
+      onChanged: { addListener() {} },
+    },
+    contextMenus: {
+      removeAll(callback) { callback(); },
+      create() {},
+      onClicked: { addListener(listener) { contextMenuListener = listener; } },
+    },
+    windows: {
+      async create(options) { createdWindow = options; },
     },
     declarativeNetRequest: { updateDynamicRules() {} },
   };
@@ -42,7 +65,7 @@ function createHarness(modelResponse = "ผลลัพธ์", storageData = {}
     };
   };
   const source = fs.readFileSync(path.join(__dirname, "..", "background.js"), "utf8");
-  vm.runInNewContext(source, { chrome, fetch, console, Date, JSON, String, Object, Array, Error });
+  vm.runInNewContext(source, { chrome, fetch, console, Date, Math, JSON, String, Object, Array, Error });
 
   async function send(request) {
     return new Promise((resolve) => {
@@ -51,7 +74,14 @@ function createHarness(modelResponse = "ผลลัพธ์", storageData = {}
     });
   }
 
-  return { send, getRequest: () => fetchRequest, getRequestBody: () => fetchRequest?.body };
+  return {
+    send,
+    clickContextMenu: (info, tab = {}) => contextMenuListener(info, tab),
+    getSessionState: () => sessionState,
+    getCreatedWindow: () => createdWindow,
+    getRequest: () => fetchRequest,
+    getRequestBody: () => fetchRequest?.body,
+  };
 }
 
 test("translateSelection sends bounded context as untrusted document data", async () => {
@@ -141,4 +171,24 @@ test("GPT-5.6 uses low-latency reasoning-compatible parameters", async () => {
   assert.equal(body.max_completion_tokens, 1024);
   assert.equal("temperature" in body, false);
   assert.equal("max_tokens" in body, false);
+});
+
+test("context menu translates PDF selections in a result window", async () => {
+  const harness = createHarness("แรงดันไฟฟ้า", {
+    sync: { provider: "openai", openaiModel: "gpt-4.1-nano", targetLang: "thai" },
+    local: { apiKey: "sk-device-local" },
+  });
+
+  await harness.clickContextMenu(
+    { menuItemId: "ramantic-translate-selection", selectionText: "voltage" },
+    { title: "Electrical machines.pdf" },
+  );
+
+  assert.match(harness.getCreatedWindow().url, /^chrome-extension:\/\/test\/result\.html\?job=/);
+  assert.equal(harness.getCreatedWindow().type, "popup");
+  const job = Object.values(harness.getSessionState()).find((value) => value?.selectedText === "voltage");
+  assert.equal(job.status, "success");
+  assert.equal(job.translation, "แรงดันไฟฟ้า");
+  const payload = JSON.parse(harness.getRequestBody().messages[1].content);
+  assert.equal(payload.surrounding_context.previous, "Electrical machines.pdf");
 });

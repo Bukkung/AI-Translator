@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ramantic</title>
+    <link rel="stylesheet" href="result.css" />
+  </head>
+  <body>
+    <header>
+      <div class="logo" aria-hidden="true">R</div>
+      <div>
+        <h1>Ramantic</h1>
+        <p id="modeLabel">PDF selection</p>
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <div class="label">Selected text</div>
+        <div id="selectedText" class="source"></div>
+      </section>
+      <section>
+        <div class="result-heading">
+          <div class="label">Result</div>
+          <button id="copyButton" type="button" hidden>Copy</button>
+        </div>
+        <div id="result" class="result" aria-live="polite">
+          <span class="spinner" aria-hidden="true"></span>
+          Translating…
+        </div>
+      </section>
+    </main>
+
+    <script src="result.js"></script>
+  </body>
+</html>

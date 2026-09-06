@@ -9,6 +9,7 @@ It supports two translation modes: **selected text translation** and **full page
 
 - **Context-aware selection**: Uses the current readable block plus the previous and next readable blocks to disambiguate technical terms.
 - **Translate / Explain**: Translate only the selected text or get a concise explanation grounded in its surrounding context.
+- **PDF fallback**: In Chrome or Edge's built-in PDF viewer, select text and right-click **Translate selection with Ramantic** or **Explain selection with Ramantic**.
 - **Local-first defaults**: New installs default to Ollama, `qwen3:8b`, and Thai.
 - **Reverse Translate**: In editable fields, click the **R** button to translate text back to the detected source language.
 - **Full Page Translation**: Translate the entire page at once from the extension popup. New content added dynamically is auto-translated.
@@ -81,6 +82,8 @@ It supports two translation modes: **selected text translation** and **full page
    - **Copy** button to copy the result.
 5. Drag the popup header to reposition, or drag the edges to resize.
 
+For a PDF opened in Chrome or Edge's built-in viewer, select the text, right-click it, and choose a Ramantic Translate or Explain command. The result opens in a compact window. Browser PDF viewers expose the selected text but not the neighbouring readable blocks, so PDF fallback mode uses the selection and document title as limited context.
+
 #### 4. Translate an entire page
 
 1. Click the extension icon in the toolbar.
@@ -99,6 +102,7 @@ It supports two translation modes: **selected text translation** and **full page
 | `popup.html` | Settings popup UI |
 | `popup.js` | Settings logic — provider switching, save/load config, Ollama model loading |
 | `popup.css` | Settings popup styles |
+| `result.html`, `result.js`, `result.css` | Translation result window used by the PDF/context-menu fallback |
 | `icons/` | Extension icons (16/48/128 px) |
 
 ### Permissions & Security
@@ -107,6 +111,7 @@ It supports two translation modes: **selected text translation** and **full page
 |-----------|---------|
 | `storage` | Store API key, provider, model, style, and target language |
 | `activeTab` | Access the active tab for in-page translation |
+| `contextMenus` | Translate or explain selected text in built-in PDF viewers |
 | `declarativeNetRequest` | Strip Origin header for Ollama localhost CORS compatibility |
 | `host_permissions: https://api.openai.com/*` | Connect to OpenAI API |
 | `host_permissions: https://generativelanguage.googleapis.com/*` | Connect to Google Gemini API |

@@ -10,8 +10,30 @@ const DEFAULT_SETTINGS = {
   geminiModel: "gemini-2.5-flash",
 };
 
+const SELECTION_MENU_TRANSLATE = "ramantic-translate-selection";
+const SELECTION_MENU_EXPLAIN = "ramantic-explain-selection";
+const RESULT_JOB_PREFIX = "ramanticResult:";
+
+function createSelectionContextMenus() {
+  if (!chrome.contextMenus) return;
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: SELECTION_MENU_TRANSLATE,
+      title: "Translate selection with Ramantic",
+      contexts: ["selection"],
+    });
+    chrome.contextMenus.create({
+      id: SELECTION_MENU_EXPLAIN,
+      title: "Explain selection with Ramantic",
+      contexts: ["selection"],
+    });
+  });
+}
+
 // Initialize defaults on first install
 chrome.runtime.onInstalled.addListener((details) => {
+  createSelectionContextMenus();
+
   if (details.reason === "install") {
     chrome.storage.sync.set(DEFAULT_SETTINGS);
   } else {
@@ -59,6 +81,57 @@ chrome.runtime.onInstalled.addListener((details) => {
     ],
   });
 });
+
+chrome.contextMenus?.onClicked.addListener((info, tab) => {
+  if (info.menuItemId !== SELECTION_MENU_TRANSLATE && info.menuItemId !== SELECTION_MENU_EXPLAIN) {
+    return;
+  }
+  return handleContextMenuSelection(info, tab);
+});
+
+async function handleContextMenuSelection(info, tab) {
+  const selectedText = cleanPromptText(info.selectionText, SELECTION_LIMIT);
+  if (!selectedText) return;
+
+  const mode = info.menuItemId === SELECTION_MENU_EXPLAIN ? "explain" : "translate";
+  const jobId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const jobKey = `${RESULT_JOB_PREFIX}${jobId}`;
+  const settings = await chrome.storage.sync.get(["targetLang", "style"]);
+  const initialJob = {
+    status: "loading",
+    mode,
+    selectedText,
+    createdAt: Date.now(),
+  };
+
+  await chrome.storage.session.set({ [jobKey]: initialJob });
+  await chrome.windows.create({
+    url: chrome.runtime.getURL(`result.html?job=${encodeURIComponent(jobId)}`),
+    type: "popup",
+    width: 520,
+    height: 430,
+    focused: true,
+  });
+
+  try {
+    const translation = await handleSelectionRequest({
+      mode,
+      selectedText,
+      sourceLang: "english",
+      targetLang: settings.targetLang || "thai",
+      style: settings.style || "casual",
+      // Built-in PDF viewers expose the selection, but not neighbouring text blocks.
+      context: { current: selectedText, previous: tab?.title || "", next: "" },
+    });
+    await chrome.storage.session.set({
+      [jobKey]: { ...initialJob, status: "success", translation },
+    });
+  } catch (error) {
+    await chrome.storage.session.set({
+      [jobKey]: { ...initialJob, status: "error", error: error.message },
+    });
+  }
+}
 
 const STYLE_PROMPTS = {
   casual: "Use a casual, friendly, conversational tone",
