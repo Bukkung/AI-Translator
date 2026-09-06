@@ -1,8 +1,8 @@
-## AI Translator – Chrome Extension
+## Ramantic – Chrome Extension
 
 ### Overview
 
-AI Translator is a Chrome extension that translates text on any web page using AI.
+Ramantic is a Chrome extension that translates text on any web page using AI.
 It supports two translation modes: **selected text translation** and **full page translation**, with three AI backend options: **OpenAI**, **Google Gemini**, and **Ollama** (local).
 
 ### Key Features
@@ -56,11 +56,11 @@ It supports two translation modes: **selected text translation** and **full page
 2. Open Chrome (or any Chromium-based browser like Edge, Brave).
 3. Go to `chrome://extensions/`.
 4. Enable **Developer mode**.
-5. Click **Load unpacked** and select the `ai-translator` folder.
+5. Click **Load unpacked** and select the `Ramantic` folder.
 
 #### 2. Configure your AI provider
 
-1. Click the **AI Translator** extension icon in the browser toolbar.
+1. Click the **Ramantic** extension icon in the browser toolbar.
 2. Choose your provider:
    - **OpenAI**: Paste your API key, select a model, and click **Save**.
    - **Ollama**: Enter your Ollama server URL (default: `http://localhost:11434`), click the refresh button to load models, select a model, and click **Save**.

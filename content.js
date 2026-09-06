@@ -665,7 +665,7 @@
         completed += chunk.length;
         showLoading(`Translating... ${completed}/${totalBatches}`);
       } catch (err) {
-        console.warn("AI Translator: batch failed", err.message);
+        console.warn("Ramantic: batch failed", err.message);
         showLoadingError(`Error: ${err.message}`);
         pageTranslationState = originalTexts.size > 0 ? "translated" : "idle";
         failed = true;
@@ -788,7 +788,7 @@
           if (result[j]) batch[j].textContent = result[j];
         }
       } catch (err) {
-        console.warn("AI Translator: dynamic translate failed", err.message);
+        console.warn("Ramantic: dynamic translate failed", err.message);
       }
     }
   }
