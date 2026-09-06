@@ -4,9 +4,9 @@ const path = require("node:path");
 const test = require("node:test");
 const vm = require("node:vm");
 
-function createHarness(modelResponse = "ผลลัพธ์") {
+function createHarness(modelResponse = "ผลลัพธ์", storageData = {}) {
   let messageListener;
-  let requestBody;
+  let fetchRequest;
   const chrome = {
     runtime: {
       onInstalled: { addListener() {} },
@@ -19,17 +19,26 @@ function createHarness(modelResponse = "ผลลัพธ์") {
             provider: "ollama",
             ollamaUrl: "http://localhost:11434",
             ollamaModel: "qwen-test",
+            ...storageData.sync,
           };
         },
+      },
+      local: {
+        async get() { return storageData.local || {}; },
       },
     },
     declarativeNetRequest: { updateDynamicRules() {} },
   };
-  const fetch = async (_url, options) => {
-    requestBody = JSON.parse(options.body);
+  const fetch = async (url, options) => {
+    fetchRequest = { url, options, body: JSON.parse(options.body) };
     return {
       ok: true,
-      async json() { return { message: { content: modelResponse } }; },
+      async json() {
+        return {
+          message: { content: modelResponse },
+          choices: [{ message: { content: modelResponse } }],
+        };
+      },
     };
   };
   const source = fs.readFileSync(path.join(__dirname, "..", "background.js"), "utf8");
@@ -42,7 +51,7 @@ function createHarness(modelResponse = "ผลลัพธ์") {
     });
   }
 
-  return { send, getRequestBody: () => requestBody };
+  return { send, getRequest: () => fetchRequest, getRequestBody: () => fetchRequest?.body };
 }
 
 test("translateSelection sends bounded context as untrusted document data", async () => {
@@ -88,4 +97,24 @@ test("explain mode requests a concise grounded explanation", async () => {
   const systemPrompt = harness.getRequestBody().messages[0].content;
   assert.match(systemPrompt, /Explain the selected English text in Thai/);
   assert.match(systemPrompt, /1-3 concise sentences/);
+});
+
+test("OpenAI provider reads the API key from device-local storage", async () => {
+  const harness = createHarness("คำแปล", {
+    sync: { provider: "openai", openaiModel: "gpt-4o-mini" },
+    local: { apiKey: "sk-device-local" },
+  });
+
+  const response = await harness.send({
+    action: "translateSelection",
+    mode: "translate",
+    selectedText: "voltage",
+    sourceLang: "english",
+    targetLang: "thai",
+    context: { current: "The terminal voltage rises." },
+  });
+
+  assert.equal(response.success, true);
+  assert.equal(harness.getRequest().url, "https://api.openai.com/v1/chat/completions");
+  assert.equal(harness.getRequest().options.headers.Authorization, "Bearer sk-device-local");
 });

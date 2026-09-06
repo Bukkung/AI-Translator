@@ -23,9 +23,10 @@ let activeProvider = "openai";
 let ollamaLoaded = false;
 let savedOllamaModel = "";
 
-// Load saved settings
+// Load non-sensitive settings from sync storage. API keys stay on this device.
 chrome.storage.sync.get(
   {
+    // Legacy credential fields are read once so older installs can migrate them.
     apiKey: "",
     style: "casual",
     targetLang: "thai",
@@ -37,8 +38,18 @@ chrome.storage.sync.get(
     geminiModel: "gemini-2.5-flash",
   },
   (data) => {
-    if (data.apiKey) apiKeyInput.value = data.apiKey;
-    if (data.geminiApiKey) geminiApiKeyInput.value = data.geminiApiKey;
+    chrome.storage.local.get({ apiKey: "", geminiApiKey: "" }, (credentials) => {
+      const apiKey = credentials.apiKey || data.apiKey;
+      const geminiApiKey = credentials.geminiApiKey || data.geminiApiKey;
+      if (apiKey) apiKeyInput.value = apiKey;
+      if (geminiApiKey) geminiApiKeyInput.value = geminiApiKey;
+
+      if ((!credentials.apiKey && data.apiKey) || (!credentials.geminiApiKey && data.geminiApiKey)) {
+        chrome.storage.local.set({ apiKey, geminiApiKey }, () => {
+          chrome.storage.sync.remove(["apiKey", "geminiApiKey"]);
+        });
+      }
+    });
     const radio = document.querySelector(`input[name="style"][value="${data.style}"]`);
     if (radio) radio.checked = true;
     targetLangSelect.value = data.targetLang;
@@ -136,11 +147,13 @@ saveSettingsBtn.addEventListener("click", () => {
     return;
   }
 
+  const credentials = {
+    apiKey: apiKeyInput.value.trim(),
+    geminiApiKey: geminiApiKeyInput.value.trim(),
+  };
   const settings = {
     provider: activeProvider,
-    apiKey: apiKeyInput.value.trim(),
     openaiModel: openaiModelSelect.value,
-    geminiApiKey: geminiApiKeyInput.value.trim(),
     geminiModel: geminiModelSelect.value,
     ollamaUrl: ollamaUrlInput.value.trim() || "http://localhost:11434",
     ollamaModel: ollamaModelSelect.value,
@@ -148,8 +161,11 @@ saveSettingsBtn.addEventListener("click", () => {
     targetLang: targetLangSelect.value,
   };
 
-  chrome.storage.sync.set(settings, () => {
-    showStatus("Settings saved!", "success");
+  chrome.storage.local.set(credentials, () => {
+    chrome.storage.sync.set(settings, () => {
+      chrome.runtime.sendMessage({ action: "settingsChanged" });
+      showStatus("Settings saved!", "success");
+    });
   });
 });
 

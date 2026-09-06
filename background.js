@@ -104,6 +104,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch((err) => sendResponse({ success: false, error: err.message }));
     return true;
   }
+  if (request.action === "settingsChanged") {
+    _cachedConfig = null;
+    _cachedConfigTime = 0;
+    sendResponse({ success: true });
+    return false;
+  }
   if (request.action === "translateBatch") {
     handleTranslateBatch(request.texts, request.sourceLang, request.targetLang, request.style)
       .then((translations) => sendResponse({ success: true, translations }))
@@ -128,10 +134,15 @@ async function fetchOllamaModels(url) {
 }
 
 async function getProviderConfig() {
-  const data = await chrome.storage.sync.get([
-    "provider", "apiKey", "ollamaUrl", "ollamaModel", "openaiModel",
-    "geminiApiKey", "geminiModel",
+  const [settings, credentials] = await Promise.all([
+    chrome.storage.sync.get([
+      "provider", "ollamaUrl", "ollamaModel", "openaiModel", "geminiModel",
+      // Legacy locations are kept as a read fallback during migration.
+      "apiKey", "geminiApiKey",
+    ]),
+    chrome.storage.local.get(["apiKey", "geminiApiKey"]),
   ]);
+  const data = { ...settings, ...credentials };
   const provider = data.provider || "openai";
 
   if (provider === "ollama") {
@@ -179,6 +190,11 @@ async function getProviderConfig() {
 
 let _cachedConfig = null;
 let _cachedConfigTime = 0;
+
+chrome.storage.onChanged?.addListener(() => {
+  _cachedConfig = null;
+  _cachedConfigTime = 0;
+});
 
 async function getCachedProviderConfig() {
   const now = Date.now();

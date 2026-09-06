@@ -138,6 +138,19 @@ label {
   box-shadow: var(--shadow-sm);
 }
 
+.provider-help,
+.key-help {
+  margin-top: 7px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.key-help {
+  margin-top: -3px;
+  margin-bottom: 10px;
+}
+
 /* ===== Inputs ===== */
 .input-field,
 .select-field {

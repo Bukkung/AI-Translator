@@ -22,14 +22,15 @@
     <div class="section">
       <label class="field-label">Provider</label>
       <div class="provider-tabs">
-        <button class="provider-tab active" data-provider="openai">OpenAI</button>
-        <button class="provider-tab" data-provider="gemini">Gemini</button>
+        <button class="provider-tab active" data-provider="openai">OpenAI API</button>
+        <button class="provider-tab" data-provider="gemini">Gemini API</button>
         <button class="provider-tab" data-provider="ollama">Ollama</button>
       </div>
+      <p class="provider-help">OpenAI/Gemini usually respond faster. Ollama stays private and runs locally.</p>
     </div>
 
     <div id="openaiSettings" class="section">
-      <label for="apiKey">API Key</label>
+      <label for="apiKey">OpenAI API Key</label>
       <div class="key-row">
         <input
           type="password"
@@ -43,6 +44,7 @@
           </svg>
         </button>
       </div>
+      <p class="key-help">Stored only on this device. Sent only to OpenAI when this provider is selected.</p>
       <label for="openaiModel">Model</label>
       <select id="openaiModel" class="select-field">
         <option value="gpt-4o-mini">gpt-4o-mini</option>
@@ -56,7 +58,7 @@
     </div>
 
     <div id="geminiSettings" class="section hidden">
-      <label for="geminiApiKey">API Key</label>
+      <label for="geminiApiKey">Gemini API Key</label>
       <div class="key-row">
         <input
           type="password"
@@ -70,6 +72,7 @@
           </svg>
         </button>
       </div>
+      <p class="key-help">Stored only on this device. Sent only to Google when this provider is selected.</p>
       <label for="geminiModel">Model</label>
       <select id="geminiModel" class="select-field">
         <option value="gemini-3.6-flash">gemini-3.6-flash</option>

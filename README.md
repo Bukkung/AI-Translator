@@ -22,7 +22,7 @@ It supports two translation modes: **selected text translation** and **full page
 - **Draggable & Resizable Popup**: Move the translation popup by dragging the header; resize by dragging the edges.
 - **Copy to Clipboard**: One-click copy of translated text.
 - **Smart Language Switching**: If target language matches source language, auto-switches (e.g. English ↔ Vietnamese).
-- **Settings Sync**: All settings stored in `chrome.storage.sync` and synced across devices.
+- **Settings Sync**: Non-sensitive preferences sync across devices; API keys remain in device-local extension storage.
 
 ### How It Works
 
@@ -68,7 +68,7 @@ It supports two translation modes: **selected text translation** and **full page
    - **Ollama**: Enter your Ollama server URL (default: `http://localhost:11434`), click the refresh button to load models, select a model, and click **Save**.
 3. Choose the default **style** and **target language**.
 
-> Note: The API key is stored in `chrome.storage.sync` in your browser and is **not** part of the source code.
+> Note: API keys are stored in `chrome.storage.local` on this device and are **not** synced or included in the source code.
 
 #### 3. Translate selected text
 
@@ -112,7 +112,7 @@ It supports two translation modes: **selected text translation** and **full page
 | `host_permissions: https://generativelanguage.googleapis.com/*` | Connect to Google Gemini API |
 | `host_permissions: http://localhost:*/*`, `http://127.0.0.1:*/*` | Connect to local Ollama server |
 
-- The API key is **only stored locally** in `chrome.storage.sync`.
+- API keys are stored only in device-local `chrome.storage.local`.
 - No config file in the repo contains a hardcoded API key.
 
 ### Technical Details
